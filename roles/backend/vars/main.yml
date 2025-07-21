@@ -1,0 +1,4 @@
+makefile_dir: "{{ backend_path }}"
+env_bin: "{{ makefile_dir }}/.venv/bin"
+service_name: "nejat125"
+env_file: "{{ backend_path }}/.env"

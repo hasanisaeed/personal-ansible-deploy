@@ -1,0 +1,24 @@
+- name: Ensure nginx installed
+  apt:
+    name: nginx
+    state: present
+  become: true
+
+- name: Remove old front-end files
+  file:
+    path: "{{ target_path }}"
+    state: absent
+  become: true
+
+- name: Copy new front-end files
+  synchronize:
+    src: "{{ build_src }}/"
+    dest: "{{ target_path }}"
+    delete: yes
+  delegate_to: localhost
+
+- name: Restart nginx
+  systemd:
+    name: "{{ nginx_service }}"
+    state: restarted
+  become: true

@@ -1,0 +1,11 @@
+- name: Deploy Nejat125 Stack
+  hosts: all
+  vars:
+    env_name: "{{ 'production' if inventory_hostname in groups['production'] else 'staging' }}"
+
+  vars_files:
+    - "group_vars/{{ env_name }}.yml"
+  
+  roles:
+    - { role: backend, tags: [backend] }
+    - { role: frontend, tags: [frontend] }

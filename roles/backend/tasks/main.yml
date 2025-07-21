@@ -1,0 +1,130 @@
+- name: Install git
+  apt:
+    name:
+      - git
+    state: present
+  become: true
+
+- name: Install Poetry via official installer
+  become: true
+  become_user: deploy
+  shell: |
+    curl -sSL https://install.python-poetry.org | python3 -
+  args:
+    creates: /home/deploy/.local/bin/poetry
+
+- name: Ensure poetry bin directory in PATH
+  become: true
+  become_user: deploy
+  lineinfile:
+    path: /home/deploy/.bashrc
+    line: 'export PATH="$HOME/.local/bin:$PATH"'
+    insertafter: EOF
+
+- name: Ensure project directory exists and owned by deploy
+  file:
+    path: "{{ backend_path }}"
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: '0755'
+  become: true
+
+- name: Configure Git safe directory
+  become: true
+  become_user: deploy
+  command: git config --global --add safe.directory {{ backend_path }}
+
+- name: Ensure correct ownership of existing repo
+  become: true
+  file:
+    path: "{{ backend_path }}"
+    recurse: yes
+    owner: deploy
+    group: deploy
+
+- name: Clone or update repo
+  git:
+    repo: "{{ backend_repo }}"
+    dest: "{{ backend_path }}"
+    version: "{{ branch }}"
+    force: yes
+    key_file: ~/.ssh/deploy_git_key
+    accept_hostkey: true
+    update: yes
+  become: true
+  become_user: deploy
+
+- name: Install dependencies with Poetry (no-root)
+  command: poetry install --no-root
+  args:
+    chdir: "{{ backend_path }}"
+  environment:
+    PATH: "/home/deploy/.local/bin:{{ ansible_env.PATH }}"
+  become: true
+  become_user: deploy
+  become_user: deploy
+
+- name: Run migrations
+  command: make migrate
+  args:
+    chdir: "{{ backend_path }}"
+  environment:
+    PATH: "/home/deploy/.local/bin:{{ ansible_env.PATH }}"
+  become: true
+  become_user: deploy
+
+- name: Copy systemd unit
+  copy:
+    dest: /etc/systemd/system/{{ service_name }}.service
+    content: |
+      [Unit]
+      Description=Nejat125 Gunicorn Service
+      After=network.target
+
+      [Service]
+      User=root
+      Group=www-data
+      WorkingDirectory={{ makefile_dir }}/src
+      EnvironmentFile={{ env_file }}
+      ExecStart={{ env_bin }}/gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --workers 8
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=65536
+      StandardOutput=append:{{ makefile_dir }}/output.log
+      StandardError=append:{{ makefile_dir }}/error.log
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+
+- name: Ensure socket file unit
+  copy:
+    dest: /etc/systemd/system/{{ service_name }}.socket
+    content: |
+      [Unit]
+      Description=Socket for Nejat125 Service
+
+      [Socket]
+      ListenStream=/run/nejat125.sock
+
+      [Install]
+      WantedBy=sockets.target
+  become: true
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+  become: true
+
+- name: Restart backend service
+  systemd:
+    name: "{{ service_name }}.socket"
+    state: started
+  become: true
+
+- name: Restart backend
+  systemd:
+    name: "{{ service_name }}.service"
+    state: restarted
+  become: true

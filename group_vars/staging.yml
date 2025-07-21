@@ -1,0 +1,5 @@
+branch: develop
+backend_repo: "git@github.com:ah-ryca/nejat125-server.git"
+frontend_repo: "git@github.com/ah-ryca/nejat125-web.git"
+backend_path: "/var/django/nejat125-server"
+frontend_build: "/var/www/html/nejat125.kerbabar.ir/web"

@@ -1,0 +1,3 @@
+build_src: "build/web"
+target_path: "{{ frontend_build }}"
+nginx_service: "nginx"
